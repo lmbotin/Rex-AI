@@ -3,7 +3,7 @@
 **CS224G Final Project**
 
 **Team**
-- Luis Marc Botin — lmbotin@stanford.edu
+- Luis Botin — lmbotin@stanford.edu
 - Jesus Santos — jsaranda@stanford.edu
 
 ---
