@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field, validator
 
 
 # ============================================================================
-# Enums
+# Enums (predefined list of allowed values)
 # ============================================================================
 
 
@@ -59,7 +59,7 @@ class DamageSeverity(str, Enum):
 
 
 # ============================================================================
-# Provenance Model
+# Provenance Model (this part checks where a specific part of the claim came from)
 # ============================================================================
 
 
@@ -88,6 +88,8 @@ class Provenance(BaseModel):
 
 class ClaimantInfo(BaseModel):
     """Basic claimant information (minimal for Sprint 1)."""
+    # all optional since at the start of the call you might not have all of this yet
+    # (ai collects this during convo)
     name: Optional[str] = Field(None, description="Claimant full name")
     policy_number: Optional[str] = Field(None, description="Insurance policy number")
     contact_phone: Optional[str] = Field(None, description="Contact phone number")
@@ -125,13 +127,6 @@ class PropertyDamageInfo(BaseModel):
     damage_severity: DamageSeverity = Field(default=DamageSeverity.UNKNOWN, description="Severity assessment")
     damage_severity_provenance: Optional[Provenance] = None
 
-    @validator('estimated_repair_cost')
-    def validate_repair_cost(cls, v: Optional[float]) -> Optional[float]:
-        """Ensure repair cost is non-negative if provided."""
-        if v is not None and v < 0:
-            raise ValueError("Estimated repair cost cannot be negative")
-        return v
-
 
 class EvidenceChecklist(BaseModel):
     """Tracks what evidence has been provided."""
@@ -149,14 +144,8 @@ class EvidenceChecklist(BaseModel):
         description="List of missing required evidence (e.g., 'repair_estimate', 'damage_photos')"
     )
 
-    @validator('damage_photo_count')
-    def validate_photo_count(cls, v: int) -> int:
-        """Ensure photo count is non-negative."""
-        if v < 0:
-            raise ValueError("Photo count cannot be negative")
-        return v
 
-
+# this is some basic initial fraud detection
 class ConsistencyFlags(BaseModel):
     """Flags for evidence consistency issues."""
 
@@ -165,7 +154,6 @@ class ConsistencyFlags(BaseModel):
         default_factory=list,
         description="List of specific conflicts (e.g., 'date mismatch: text says Jan 1, image EXIF says Jan 5')"
     )
-
 
 # ============================================================================
 # Main Claim Schema
