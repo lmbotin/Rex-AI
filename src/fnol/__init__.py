@@ -1,51 +1,38 @@
 """
 First Notice of Loss (FNOL) module.
 
-Multimodal claim extraction pipeline for property damage claims.
+Operational liability claims (Track & Trace / AI logistics).
+Checker, extractor, state_manager, and pipeline are not imported here
+so the package loads when schema has only operational types.
+Import them directly from .checker, .extractor, .state_manager, .pipeline if needed.
 """
 
-from .checker import CheckReport, check_claim
 from .config import ExtractionConfig
-from .extractor import PropertyClaimExtractor
-from .pipeline import ExtractionPipeline, parse_claim
 from .schema import (
-    # Enums
     SourceModality,
-    DamageType,
-    PropertyType,
-    DamageSeverity,
-    # Models
+    IncidentType,
+    AssetType,
+    ImpactSeverity,
     Provenance,
     ClaimantInfo,
     IncidentInfo,
-    PropertyDamageInfo,
+    OperationalImpactInfo,
     EvidenceChecklist,
     ConsistencyFlags,
-    PropertyDamageClaim,
+    OperationalLiabilityClaim,
 )
-from .state_manager import PropertyClaimStateManager
 
 __all__ = [
-    # Pipeline functions
-    "parse_claim",
-    "check_claim",
-    # Classes
-    "ExtractionPipeline",
     "ExtractionConfig",
-    "CheckReport",
-    "PropertyClaimStateManager",
-    "PropertyClaimExtractor",
-    # Enums
     "SourceModality",
-    "DamageType",
-    "PropertyType",
-    "DamageSeverity",
-    # Models
+    "IncidentType",
+    "AssetType",
+    "ImpactSeverity",
     "Provenance",
     "ClaimantInfo",
     "IncidentInfo",
-    "PropertyDamageInfo",
+    "OperationalImpactInfo",
     "EvidenceChecklist",
     "ConsistencyFlags",
-    "PropertyDamageClaim",
+    "OperationalLiabilityClaim",
 ]

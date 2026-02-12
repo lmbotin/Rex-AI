@@ -18,6 +18,7 @@ from fastapi import WebSocket  # type: ignore[import-untyped]
 
 from ..fnol import PropertyClaimExtractor, PropertyClaimStateManager
 from ..fnol.checker import check_claim, CheckReport
+from ..policy import get_policy_service
 from .openai_realtime import OpenAIRealtimeClient
 from .prompts import get_voice_agent_prompt, CLAIM_COMPLETE_PROMPT
 
@@ -463,13 +464,33 @@ class AudioBridge:
         # Get state manager's view of missing fields
         missing = self.claim_state.get_missing_fields()
         missing_ids = [f["id"] for f in missing[:5]]  # First 5 missing
-        
+
+        # Policy check: if we have name + policy number, verify against policy DB
+        policy_issue = None
+        claim = self.claim_state.claim
+        if getattr(claim.claimant, "policy_number", None) and getattr(claim.claimant, "name", None):
+            try:
+                svc = get_policy_service()
+                policy = svc.get_policy(str(claim.claimant.policy_number))
+                if not policy:
+                    policy_issue = "Policy not found. Ask the caller to confirm their policy number."
+                elif not svc.verify_claimant_name(policy, claim.claimant.name):
+                    policy_issue = f"The name on the policy is '{policy.named_insured}'. Please confirm with the caller that they are the policyholder."
+            except Exception as e:
+                logger.debug(f"Policy check skipped: {e}")
+
         # Also include checker's recommended questions
         recommended_questions = report.recommended_questions
-        
+
         next_q = self.claim_state.get_next_question()
         next_question = next_q["question"] if next_q else None
-        
+        # When there is a policy issue, prioritize resolving it before other questions
+        if policy_issue:
+            next_question = (
+                "Address the policy issue with the caller first (confirm policy number or name). "
+                "Do not ask about damage or incident details until this is resolved."
+            )
+
         # If claim is sufficiently complete, switch to wrap-up mode
         if report.completeness_score >= COMPLETENESS_THRESHOLD and not self._claim_complete_notified:
             self._claim_complete_notified = True
@@ -480,17 +501,20 @@ class AudioBridge:
             
             # Use the claim complete prompt
             new_prompt = CLAIM_COMPLETE_PROMPT
-            
+            if policy_issue:
+                new_prompt += f"\n\nPOLICY CHECK: {policy_issue}"
+
             # Add any remaining recommendations
             if recommended_questions:
                 new_prompt += f"\n\nOPTIONAL FOLLOW-UPS (only if time permits):\n"
                 for q in recommended_questions[:2]:
                     new_prompt += f"- {q}\n"
         else:
-            # Build prompt with completeness context
+            # Build prompt with completeness context and any policy check message
             new_prompt = get_voice_agent_prompt(
                 missing_fields=missing_ids,
                 next_question=next_question,
+                policy_issue=policy_issue,
             )
             
             # Add completeness status

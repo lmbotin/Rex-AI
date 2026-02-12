@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import List
 
 from .config import ExtractionConfig
-from .pipeline import parse_claim
+from .operational_pipeline import parse_claim
 
 
 def setup_logging(verbose: bool = False):
@@ -70,12 +70,12 @@ Examples:
         help='Path to file containing claim description'
     )
 
-    # Image inputs
+    # Attachment inputs (logs, screenshots, photos)
     parser.add_argument(
         '--images',
         nargs='*',
         default=[],
-        help='Paths to images (space-separated)'
+        help='Paths to attachments (space-separated). Can include logs (.json/.log) and photos (.png/.jpg).'
     )
 
     # Claimant info
@@ -160,9 +160,9 @@ def main():
 
         logger.info(f"Input text: {len(text)} characters")
 
-        # Get images
-        image_paths: List[str] = args.images or []
-        logger.info(f"Input images: {len(image_paths)} files")
+        # Get attachments
+        attachment_paths: List[str] = args.images or []
+        logger.info(f"Input attachments: {len(attachment_paths)} files")
 
         # Build claimant info
         claimant_info = {}
@@ -196,7 +196,7 @@ def main():
         logger.info("Starting claim parsing...")
         claim = parse_claim(
             text=text,
-            image_paths=image_paths,
+            attachment_paths=attachment_paths,
             claimant_info=claimant_info if claimant_info else None,
             config=config
         )

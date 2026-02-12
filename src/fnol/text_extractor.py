@@ -102,7 +102,7 @@ Return ONLY a valid JSON object with this exact structure:
   "incident_location_confidence": 0.0-1.0,
   "incident_description": "factual summary of what happened - or null",
   "incident_description_confidence": 0.0-1.0,
-  "incident_type": "misroute|delay|loss|data_error|prediction_failure|system_outage|other|unknown",
+  "incident_type": "misroute|delay|loss|data_error|prediction_failure|pricing_error|system_outage|other|unknown",
   "incident_type_confidence": 0.0-1.0,
   "asset_type": "shipment|package|container|ai_model|sensor|route|prediction|document|other|unknown",
   "asset_type_confidence": 0.0-1.0,
@@ -120,6 +120,7 @@ INCIDENT TYPE DEFINITIONS (use these to classify):
 - loss: Shipment/package/data lost entirely, unrecoverable
 - data_error: Incorrect data entry, corrupted records, wrong information processed
 - prediction_failure: AI/ML model produced incorrect forecast, recommendation, or classification
+- pricing_error: Negotiated price for the load is lower than its cost (e.g. due to AI or system error in pricing/cost calculation)
 - system_outage: System unavailability that caused operational impact
 - other: Incident doesn't fit above categories but is clearly described
 - unknown: Cannot determine incident type from description
@@ -261,6 +262,9 @@ class MockTextExtractor(TextExtractor):
         elif 'data error' in text_lower or 'incorrect data' in text_lower or 'wrong information' in text_lower or 'corrupted' in text_lower:
             extracted['incident_type'] = 'data_error'
             extracted['incident_type_confidence'] = 0.8
+        elif ('price' in text_lower and 'cost' in text_lower) or 'negotiated price' in text_lower or 'below cost' in text_lower or 'lower than cost' in text_lower:
+            extracted['incident_type'] = 'pricing_error'
+            extracted['incident_type_confidence'] = 0.75
         elif 'prediction' in text_lower or 'forecast' in text_lower or 'misclassif' in text_lower or 'model' in text_lower:
             extracted['incident_type'] = 'prediction_failure'
             extracted['incident_type_confidence'] = 0.7

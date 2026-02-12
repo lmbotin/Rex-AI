@@ -47,6 +47,7 @@ class StoredClaim:
     transcript: Optional[list] = None  # Conversation transcript
     consistency: Optional[dict] = None  # Consistency flags
     call_metadata: Optional[dict] = None  # Call timing, etc.
+    operational_impact: Optional[dict] = None  # AI logistics claims
 
 
 class ClaimStore:
@@ -105,7 +106,8 @@ class ClaimStore:
                     -- Additional data (JSON)
                     transcript TEXT,
                     consistency TEXT,
-                    call_metadata TEXT
+                    call_metadata TEXT,
+                    operational_impact TEXT
                 )
             """)
             
@@ -127,6 +129,38 @@ class ClaimStore:
                 conn.execute("ALTER TABLE claims ADD COLUMN call_metadata TEXT")
             except sqlite3.OperationalError:
                 pass
+            try:
+                conn.execute("ALTER TABLE claims ADD COLUMN operational_impact TEXT")
+            except sqlite3.OperationalError:
+                pass
+
+            # Resolved claims (policy number + amount paid; real-time or human-approved)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS resolved_claims (
+                    claim_id TEXT PRIMARY KEY,
+                    policy_number TEXT NOT NULL,
+                    amount REAL NOT NULL,
+                    resolved_at TEXT NOT NULL,
+                    resolution_type TEXT NOT NULL,
+                    resolved_by TEXT
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_resolved_policy ON resolved_claims(policy_number)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_resolved_at ON resolved_claims(resolved_at)")
+
+            # Non-resolved claims (policy number, amount if any, reason not resolved)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS non_resolved_claims (
+                    claim_id TEXT PRIMARY KEY,
+                    policy_number TEXT NOT NULL,
+                    amount REAL,
+                    reason_not_resolved TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    notes TEXT
+                )
+            """)
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_non_resolved_policy ON non_resolved_claims(policy_number)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_non_resolved_reason ON non_resolved_claims(reason_not_resolved)")
             
             conn.commit()
     
@@ -177,13 +211,15 @@ class ClaimStore:
         consistency = claim_data.get("consistency", {})
         
         with self._get_connection() as conn:
+            # Support both property_damage and operational_impact (AI logistics) claims
+            operational_impact = claim_data.get("operational_impact")
             conn.execute("""
                 INSERT INTO claims (
                     claim_id, created_at, updated_at, status, source,
                     claimant, incident, property_damage, evidence,
                     call_sid, session_id,
-                    transcript, consistency, call_metadata
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    transcript, consistency, call_metadata, operational_impact
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 claim_id,
                 now,
@@ -199,6 +235,7 @@ class ClaimStore:
                 json.dumps(transcript) if transcript else None,
                 json.dumps(consistency) if consistency else None,
                 json.dumps(call_metadata) if call_metadata else None,
+                json.dumps(operational_impact) if operational_impact is not None else None,
             ))
             conn.commit()
         
@@ -347,6 +384,44 @@ class ClaimStore:
             conn.commit()
             return result.rowcount > 0
     
+    def save_resolved(
+        self,
+        claim_id: str,
+        policy_number: str,
+        amount: float,
+        resolution_type: str = "real_time",
+        resolved_by: Optional[str] = None,
+    ) -> bool:
+        """Save a resolved claim (real-time or human-approved). Idempotent on claim_id."""
+        now = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO resolved_claims
+                (claim_id, policy_number, amount, resolved_at, resolution_type, resolved_by)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (claim_id, policy_number, amount, now, resolution_type, resolved_by or "system")
+            conn.commit()
+        return True
+
+    def save_non_resolved(
+        self,
+        claim_id: str,
+        policy_number: str,
+        reason_not_resolved: str,
+        amount: Optional[float] = None,
+        notes: Optional[str] = None,
+    ) -> bool:
+        """Save a non-resolved claim with reason. Idempotent on claim_id."""
+        now = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO non_resolved_claims
+                (claim_id, policy_number, amount, reason_not_resolved, created_at, notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (claim_id, policy_number, amount, reason_not_resolved, now, notes)
+            conn.commit()
+        return True
+
     def delete(self, claim_id: str) -> bool:
         """Delete a claim."""
         with self._get_connection() as conn:
@@ -393,7 +468,13 @@ class ClaimStore:
                 call_metadata = json.loads(row["call_metadata"])
         except (KeyError, IndexError):
             pass
-        
+        operational_impact = None
+        try:
+            if row.get("operational_impact"):
+                operational_impact = json.loads(row["operational_impact"])
+        except (KeyError, IndexError, TypeError):
+            pass
+
         return StoredClaim(
             claim_id=row["claim_id"],
             created_at=row["created_at"],
@@ -413,6 +494,7 @@ class ClaimStore:
             transcript=transcript,
             consistency=consistency,
             call_metadata=call_metadata,
+            operational_impact=operational_impact,
         )
 
 

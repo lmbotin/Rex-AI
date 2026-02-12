@@ -6,14 +6,19 @@ and guide the agent's behavior during property damage claim intake calls.
 """
 
 
-def get_voice_agent_prompt(missing_fields: list[str] = None, next_question: str = None) -> str:
+def get_voice_agent_prompt(
+    missing_fields: list[str] = None,
+    next_question: str = None,
+    policy_issue: str = None,
+) -> str:
     """
     Generate the system prompt for the voice agent.
-    
+
     Args:
         missing_fields: List of field IDs still needed
         next_question: Suggested next question to ask
-        
+        policy_issue: Optional message from policy check (e.g. name mismatch, policy not found)
+
     Returns:
         System prompt string
     """
@@ -37,6 +42,13 @@ RULES:
 - If emergency: "Please call 911 first if you're in danger!"
 - Keep responses conversational but not too long
 
+VERIFY NAME AND POLICY FIRST (before any claim details):
+- Collect the caller's full name and policy number as the first thing.
+- The system will verify their name against the policy. Do NOT move on to damage type, address, or description until:
+  (a) You have both name and policy number, AND
+  (b) There is no POLICY CHECK message below (policy found and name matches).
+- If POLICY CHECK shows an issue (e.g. policy not found or name mismatch), resolve it with the caller before asking about damage or incident details.
+
 MUST COLLECT (all required before ending):
 1. Name
 2. Policy number
@@ -55,7 +67,7 @@ MUST COLLECT (all required before ending):
 
 ENDING (only after ALL info collected):
 1. Recap key details
-2. Explain adjuster will call in 1-2 days
+2. Explain adjuster will call in 1-2 days (or if not resolved on this call: "Your claim has been recorded; our team will contact you within 1–2 business days to follow up.")
 3. Ask if they have questions
 4. Wait for response
 5. Say goodbye warmly: "Take care, bye!"
@@ -70,7 +82,10 @@ DO NOT end until you have: name, policy, damage type, address, clear description
     
     if next_question:
         base_prompt += f"\n\nSUGGESTED NEXT QUESTION: {next_question}"
-    
+
+    if policy_issue:
+        base_prompt += f"\n\nPOLICY CHECK: {policy_issue}"
+
     return base_prompt
 
 
@@ -101,6 +116,11 @@ CRITICAL RULES:
 - NEVER invent or assume information - only record what they tell you
 - If emergency in progress: "Oh my - please call 911 first if you're in danger!"
 - Keep responses conversational but not too long
+
+VERIFY NAME AND POLICY FIRST:
+- Get the caller's name and policy number before anything else. The system verifies them against our records.
+- Do NOT ask about damage type, when it happened, or address until name and policy are verified (no POLICY CHECK issue below).
+- If POLICY CHECK shows a problem (policy not found or name doesn't match), resolve it with the caller before moving on.
 
 INFORMATION TO COLLECT (you MUST get all of these before ending):
 1. Their name
@@ -148,15 +168,17 @@ CLOSING SEQUENCE:
    - "In the meantime, if you haven't already, try to take some photos of the damage"
    - "And don't throw away any damaged stuff - they might need to see it"
 
-4. Check for questions: "Do you have any questions for me before I let you go?"
+4. If the claim is NOT being resolved on this call (e.g. it needs further review, more documents, or an adjuster visit), tell the caller clearly so they know they will be contacted: "Your claim has been recorded. Our team will review it and someone will contact you within 1 to 2 business days to follow up." Do not leave them wondering—they should know they will be contacted.
 
-5. WAIT for their response - they might have questions!
+5. Check for questions: "Do you have any questions for me before I let you go?"
 
-6. Say goodbye warmly and naturally: "Alright, well you take care, and we'll be in touch real soon. Bye!"
+6. WAIT for their response - they might have questions!
 
-7. Let them say goodbye back - the system will automatically detect when you've both said goodbye and end the call.
+7. Say goodbye warmly and naturally: "Alright, well you take care, and we'll be in touch real soon. Bye!"
 
-IMPORTANT: Don't rush the ending! Let the conversation close naturally. Just say "bye" like a normal person would - the system handles the rest."""
+8. Let them say goodbye back - the system will automatically detect when you've both said goodbye and end the call.
+
+IMPORTANT: Don't rush the ending! Let the conversation close naturally. Just say "bye" like a normal person would - the system handles the rest. Always make sure the caller knows that if their claim is not resolved on this call, our team will contact them within 1–2 business days."""
 
 
 # Error recovery prompts

@@ -1,0 +1,114 @@
+[
+  {
+    "policy_number": "987654",
+    "named_insured": "Acme Logistics Inc.",
+    "covered_incident_types": ["misroute", "delay", "loss", "prediction_failure", "pricing_error", "system_outage", "data_error"],
+    "limit_amount": 50000,
+    "deductible": 500,
+    "per_incident_type_limits": {"delay": 10000, "loss": 25000, "pricing_error": 15000},
+    "extra_info_rules": [
+      {"condition": "incident_type == prediction_failure", "required_evidence": "system_logs", "question_hint": "Do you have system logs or audit trail from the AI system we can review?", "required": true},
+      {"condition": "incident_type == pricing_error", "required_evidence": "liability_assessment", "question_hint": "Do you have documentation showing the negotiated price and cost for the load (e.g. pricing sheet or cost breakdown)?", "required": true},
+      {"condition": "incident_type == loss", "required_evidence": "incident_report", "question_hint": "Have you filed an incident report? We'll need a copy for the claim.", "required": true},
+      {"condition": "estimated_liability_cost > 5000", "required_evidence": "liability_assessment", "question_hint": "For claims over $5,000 we need a liability or impact assessment. Do you have one?", "required": true}
+    ],
+    "resolution_rules": {"auto_resolve_max_amount": 2000, "require_name_match": true, "require_evidence_complete": true, "require_incident_type_covered": true}
+  },
+  {
+    "policy_number": "555123",
+    "named_insured": "Beta Freight Co.",
+    "covered_incident_types": ["misroute", "delay", "loss", "prediction_failure", "pricing_error"],
+    "limit_amount": 25000,
+    "deductible": 250,
+    "per_incident_type_limits": {"delay": 8000, "loss": 15000, "pricing_error": 8000},
+    "extra_info_rules": [
+      {"condition": "incident_type == prediction_failure", "required_evidence": "system_logs", "question_hint": "Can you provide system logs from the routing or prediction service?", "required": true},
+      {"condition": "incident_type == pricing_error", "required_evidence": "liability_assessment", "question_hint": "Do you have documentation showing the negotiated price and cost for the load?", "required": true},
+      {"condition": "incident_type == loss", "required_evidence": "incident_report", "question_hint": "Have you filed an incident report? We'll need a copy for the claim.", "required": true}
+    ],
+    "resolution_rules": {"auto_resolve_max_amount": 1000, "require_name_match": true, "require_evidence_complete": true, "require_incident_type_covered": true}
+  },
+  {
+    "policy_number": "111001",
+    "named_insured": "Delta Cargo LLC",
+    "covered_incident_types": ["misroute", "delay", "loss", "prediction_failure", "pricing_error", "system_outage"],
+    "limit_amount": 35000,
+    "deductible": 300,
+    "per_incident_type_limits": {"delay": 10000, "loss": 20000, "system_outage": 12000, "pricing_error": 10000},
+    "extra_info_rules": [
+      {"condition": "incident_type == prediction_failure", "required_evidence": "system_logs", "question_hint": "Do you have system logs or audit trail from the AI system we can review?", "required": true},
+      {"condition": "incident_type == pricing_error", "required_evidence": "liability_assessment", "question_hint": "Do you have documentation showing the negotiated price and cost for the load?", "required": true},
+      {"condition": "incident_type == loss", "required_evidence": "incident_report", "question_hint": "Have you filed an incident report? We'll need a copy for the claim.", "required": true},
+      {"condition": "estimated_liability_cost > 5000", "required_evidence": "liability_assessment", "question_hint": "For claims over $5,000 we need a liability or impact assessment. Do you have one?", "required": true}
+    ],
+    "resolution_rules": {"auto_resolve_max_amount": 1500, "require_name_match": true, "require_evidence_complete": true, "require_incident_type_covered": true}
+  },
+  {
+    "policy_number": "111002",
+    "named_insured": "Northern Shipping Co.",
+    "covered_incident_types": ["misroute", "delay", "loss", "pricing_error", "system_outage", "data_error"],
+    "limit_amount": 40000,
+    "deductible": 400,
+    "per_incident_type_limits": {"delay": 12000, "loss": 22000, "pricing_error": 12000},
+    "extra_info_rules": [
+      {"condition": "incident_type == loss", "required_evidence": "incident_report", "question_hint": "Have you filed an incident report? We'll need a copy for the claim.", "required": true},
+      {"condition": "estimated_liability_cost > 5000", "required_evidence": "liability_assessment", "question_hint": "For claims over $5,000 we need a liability or impact assessment. Do you have one?", "required": true}
+    ],
+    "resolution_rules": {"auto_resolve_max_amount": 2000, "require_name_match": true, "require_evidence_complete": true, "require_incident_type_covered": true}
+  },
+  {
+    "policy_number": "111003",
+    "named_insured": "Pacific Logistics Ltd.",
+    "covered_incident_types": ["misroute", "delay", "loss", "prediction_failure", "pricing_error", "data_error"],
+    "limit_amount": 30000,
+    "deductible": 250,
+    "per_incident_type_limits": {"delay": 9000, "loss": 18000, "pricing_error": 9000},
+    "extra_info_rules": [
+      {"condition": "incident_type == prediction_failure", "required_evidence": "system_logs", "question_hint": "Do you have system logs we can review?", "required": true},
+      {"condition": "incident_type == pricing_error", "required_evidence": "liability_assessment", "question_hint": "Do you have documentation showing the negotiated price and cost for the load?", "required": true},
+      {"condition": "incident_type == loss", "required_evidence": "incident_report", "question_hint": "Have you filed an incident report? We'll need a copy for the claim.", "required": true}
+    ],
+    "resolution_rules": {"auto_resolve_max_amount": 1000, "require_name_match": true, "require_evidence_complete": true, "require_incident_type_covered": true}
+  },
+  {
+    "policy_number": "111004",
+    "named_insured": "Summit Supply Chain Inc.",
+    "covered_incident_types": ["misroute", "delay", "loss", "prediction_failure", "pricing_error", "system_outage"],
+    "limit_amount": 45000,
+    "deductible": 500,
+    "per_incident_type_limits": {"delay": 15000, "loss": 28000, "prediction_failure": 10000, "pricing_error": 15000},
+    "extra_info_rules": [
+      {"condition": "incident_type == prediction_failure", "required_evidence": "system_logs", "question_hint": "Do you have system logs or audit trail from the AI system we can review?", "required": true},
+      {"condition": "incident_type == pricing_error", "required_evidence": "liability_assessment", "question_hint": "Do you have documentation showing the negotiated price and cost for the load?", "required": true},
+      {"condition": "incident_type == loss", "required_evidence": "incident_report", "question_hint": "Have you filed an incident report? We'll need a copy for the claim.", "required": true},
+      {"condition": "estimated_liability_cost > 5000", "required_evidence": "liability_assessment", "question_hint": "For claims over $5,000 we need a liability or impact assessment. Do you have one?", "required": true}
+    ],
+    "resolution_rules": {"auto_resolve_max_amount": 2500, "require_name_match": true, "require_evidence_complete": true, "require_incident_type_covered": true}
+  },
+  {
+    "policy_number": "111005",
+    "named_insured": "Valley Transport Co.",
+    "covered_incident_types": ["misroute", "delay", "loss", "pricing_error", "system_outage", "data_error"],
+    "limit_amount": 20000,
+    "deductible": 200,
+    "per_incident_type_limits": {"delay": 6000, "loss": 12000, "pricing_error": 6000},
+    "extra_info_rules": [
+      {"condition": "incident_type == pricing_error", "required_evidence": "liability_assessment", "question_hint": "Do you have documentation showing the negotiated price and cost for the load?", "required": true},
+      {"condition": "incident_type == loss", "required_evidence": "incident_report", "question_hint": "Have you filed an incident report? We'll need a copy for the claim.", "required": true},
+      {"condition": "estimated_liability_cost > 5000", "required_evidence": "liability_assessment", "question_hint": "For claims over $5,000 we need a liability or impact assessment. Do you have one?", "required": true}
+    ],
+    "resolution_rules": {"auto_resolve_max_amount": 1500, "require_name_match": true, "require_evidence_complete": true, "require_incident_type_covered": true}
+  },
+  {
+    "policy_number": "123456",
+    "named_insured": "Embutidos Montes de Toledo",
+    "covered_incident_types": ["misroute", "delay", "loss", "pricing_error", "system_outage", "data_error"],
+    "limit_amount": 35000,
+    "deductible": 300,
+    "per_incident_type_limits": {"delay": 10000, "loss": 20000, "pricing_error": 10000},
+    "extra_info_rules": [
+      {"condition": "incident_type == pricing_error", "required_evidence": "liability_assessment", "question_hint": "Do you have documentation showing the negotiated price and cost for the load?", "required": true}
+    ],
+    "resolution_rules": {"auto_resolve_max_amount": 1500, "require_name_match": true, "require_evidence_complete": true, "require_incident_type_covered": true}
+  }
+]

@@ -36,6 +36,7 @@ class IncidentType(str, Enum):
     LOSS = "loss"                   # Shipment/package lost entirely
     DATA_ERROR = "data_error"       # Incorrect data entry or processing
     PREDICTION_FAILURE = "prediction_failure"  # AI model made incorrect prediction
+    PRICING_ERROR = "pricing_error" # Negotiated price for load lower than cost (e.g. AI/system error)
     SYSTEM_OUTAGE = "system_outage" # System unavailability causing impact
     OTHER = "other"
     UNKNOWN = "unknown"

@@ -19,6 +19,8 @@ from openai import AsyncOpenAI
 
 from ..fnol.checker import check_claim, CheckReport
 from ..fnol.schema import PropertyDamageClaim
+from ..storage.claim_store import get_claim_store
+from ..policy import get_policy_service
 
 if TYPE_CHECKING:
     from ..fnol.checker import CheckReport
@@ -93,6 +95,69 @@ class ClaimProcessingResult:
 # =============================================================================
 
 
+def _apply_policy_step(claim_data: dict, result: "ClaimProcessingResult") -> None:
+    """
+    For AI logistics claims (with operational_impact): lookup policy, verify name,
+    compute payout, and save to resolved_claims or non_resolved_claims.
+    """
+    claim_id = claim_data.get("claim_id") or _get_nested(claim_data, "claim_id")
+    claimant = claim_data.get("claimant") or {}
+    policy_number = claimant.get("policy_number") or _get_nested(claim_data, "claimant.policy_number")
+    if not claim_id or not policy_number:
+        return
+    store = get_claim_store()
+    svc = get_policy_service()
+    policy = svc.get_policy(str(policy_number))
+    if not policy:
+        store.save_non_resolved(
+            claim_id, str(policy_number), "policy_not_found", notes="Policy not found in database"
+        )
+        result.next_actions.append("Verify policy number with claimant; add policy if new.")
+        return
+    claimant_name = claimant.get("name") or _get_nested(claim_data, "claimant.name")
+    name_ok = svc.verify_claimant_name(policy, claimant_name)
+    if not name_ok:
+        store.save_non_resolved(
+            claim_id, str(policy_number), "name_mismatch",
+            notes=f"Claimant name '{claimant_name}' does not match policy named_insured '{policy.named_insured}'"
+        )
+        result.next_actions.append("Confirm claimant name matches policy.")
+        return
+    # Coverage decision by LLM (name and policy number were already verified above, no LLM)
+    try:
+        coverage = svc.check_coverage_llm(claim_data, policy)
+    except Exception as e:
+        logger.warning("LLM coverage check failed, falling back to rule-based: %s", e)
+        coverage = svc.check_coverage(claim_data, policy)
+    if not coverage.is_covered:
+        store.save_non_resolved(
+            claim_id, str(policy_number), "incident_type_not_covered",
+            notes=coverage.reason or "Claim not covered under policy"
+        )
+        result.next_actions.append(coverage.reason or "Claim not covered under policy; queue for review.")
+        return
+    # Payout: use LLM suggestion if available, else rule-based
+    payout = coverage.suggested_payout_cap if coverage.suggested_payout_cap is not None else svc.compute_payout(claim_data, policy)
+    fraud_flagged = result.fraud_score >= 0.6 or len(result.fraud_indicators) > 0
+    can_auto = svc.can_auto_resolve(claim_data, policy, name_verified=True, fraud_flagged=fraud_flagged)
+    if can_auto and payout is not None:
+        store.save_resolved(claim_id, str(policy_number), float(payout), "real_time", resolved_by="system")
+        result.final_status = "approved"
+        result.routing_decision = RoutingDecision.AUTO_APPROVE
+        result.routing_reason = f"Policy check passed; auto-approved payout ${payout:,.2f}"
+        result.next_actions.append(f"Payout ${payout:,.2f} recorded; claim resolved.")
+    else:
+        reason = "needs_human_review"
+        if payout is None:
+            reason = "incident_type_not_covered"
+        elif not can_auto and svc.get_required_extra_info(claim_data, policy):
+            reason = "missing_evidence"
+        store.save_non_resolved(
+            claim_id, str(policy_number), reason, amount=float(payout) if payout is not None else None
+        )
+        result.next_actions.append("Claim queued for human review; policy check completed.")
+
+
 def _get_nested(data: dict, path: str, default=None):
     """Get a nested value using dot notation."""
     keys = path.split(".")
@@ -156,9 +221,8 @@ def validate_claim_from_schema(claim: PropertyDamageClaim) -> tuple[bool, list[s
 
 def validate_claim(claim_data: dict) -> tuple[bool, list[str], list[str]]:
     """
-    Validate property damage claim completeness and data quality.
-    
-    This function works with dict data (from voice agent).
+    Validate claim completeness and data quality.
+    Supports both property damage and operational (AI logistics / pricing) claims.
     For PropertyDamageClaim objects, use validate_claim_from_schema().
     
     Returns:
@@ -166,41 +230,60 @@ def validate_claim(claim_data: dict) -> tuple[bool, list[str], list[str]]:
     """
     missing = []
     errors = []
-    
-    # Required fields check for property damage claims
-    required_fields = [
-        ("claimant.name", "Claimant name"),
-        ("claimant.policy_number", "Policy number"),
-        ("incident.damage_type", "Type of damage"),
-        ("incident.incident_description", "Incident description"),
-    ]
-    
-    for path, label in required_fields:
-        value = _get_nested(claim_data, path)
-        if not value or value == "unknown":
-            missing.append(label)
-    
-    # Data quality checks
+    has_operational = claim_data.get("operational_impact") is not None
+
+    if has_operational:
+        # Operational liability claims: name, policy, incident type, and liability cost or description
+        required_fields = [
+            ("claimant.name", "Claimant name"),
+            ("claimant.policy_number", "Policy number"),
+            ("incident.incident_type", "Incident type"),
+        ]
+        for path, label in required_fields:
+            value = _get_nested(claim_data, path)
+            if not value or value == "unknown":
+                missing.append(label)
+        cost = _get_nested(claim_data, "operational_impact.estimated_liability_cost")
+        desc = _get_nested(claim_data, "incident.incident_description")
+        if cost is None and not desc:
+            missing.append("Estimated liability cost or incident description")
+        if cost is not None:
+            try:
+                c = float(cost)
+                if c < 0:
+                    errors.append("Estimated liability cost cannot be negative")
+            except (ValueError, TypeError):
+                errors.append("Estimated liability cost is not a valid number")
+    else:
+        # Property damage claims
+        required_fields = [
+            ("claimant.name", "Claimant name"),
+            ("claimant.policy_number", "Policy number"),
+            ("incident.damage_type", "Type of damage"),
+            ("incident.incident_description", "Incident description"),
+        ]
+        for path, label in required_fields:
+            value = _get_nested(claim_data, path)
+            if not value or value == "unknown":
+                missing.append(label)
+        repair_cost = _get_nested(claim_data, "property_damage.estimated_repair_cost")
+        if repair_cost is not None:
+            try:
+                c = float(repair_cost)
+                if c < 0:
+                    errors.append("Estimated repair cost cannot be negative")
+            except (ValueError, TypeError):
+                errors.append("Estimated repair cost is not a valid number")
+
+    # Common checks
     policy_number = _get_nested(claim_data, "claimant.policy_number")
-    if policy_number and len(str(policy_number)) < 4:
+    if policy_number and len(str(policy_number).strip()) < 3:
         errors.append("Policy number appears invalid (too short)")
-    
     phone = _get_nested(claim_data, "claimant.contact_phone")
     if phone and len(str(phone).replace("-", "").replace(" ", "")) < 10:
         errors.append("Phone number appears incomplete")
-    
-    # Check for estimated repair cost validity
-    repair_cost = _get_nested(claim_data, "property_damage.estimated_repair_cost")
-    if repair_cost is not None:
-        try:
-            cost = float(repair_cost)
-            if cost < 0:
-                errors.append("Estimated repair cost cannot be negative")
-        except (ValueError, TypeError):
-            errors.append("Estimated repair cost is not a valid number")
-    
+
     is_complete = len(missing) == 0 and len(errors) == 0
-    
     return is_complete, missing, errors
 
 
@@ -283,17 +366,30 @@ Has Repair Estimate: {has_estimate}
 
 def determine_priority(claim_data: dict) -> ClaimPriority:
     """
-    Determine claim priority based on property damage data.
+    Determine claim priority from property damage or operational impact data.
     """
+    # Operational (AI logistics / pricing) claims: use estimated_liability_cost
+    liability_cost = _get_nested(claim_data, "operational_impact.estimated_liability_cost")
+    if liability_cost is not None:
+        try:
+            cost = float(liability_cost)
+            if cost > 20000:
+                return ClaimPriority.URGENT
+            if cost > 5000:
+                return ClaimPriority.HIGH
+            if cost > 1000:
+                return ClaimPriority.NORMAL
+            return ClaimPriority.LOW
+        except (ValueError, TypeError):
+            pass
+
+    # Property damage claims
     severity = _get_nested(claim_data, "property_damage.damage_severity", "").lower()
     damage_type = _get_nested(claim_data, "incident.damage_type", "").lower()
     repair_cost = _get_nested(claim_data, "property_damage.estimated_repair_cost")
-    
-    # Severe damage or fire = urgent
+
     if severity == "severe" or damage_type == "fire":
         return ClaimPriority.URGENT
-    
-    # High repair cost = high priority
     if repair_cost:
         try:
             cost = float(repair_cost)
@@ -441,10 +537,14 @@ class ClaimProcessor:
             result.fraud_score,
             result.priority,
         )
-        
+
+        # Step 4b: Policy check (AI logistics operational liability)
+        if claim_data.get("operational_impact") is not None:
+            _apply_policy_step(claim_data, result)
+
         # Step 5: Determine next actions
         result.final_status, result.next_actions = get_next_actions(result.routing_decision)
-        
+
         logger.info(f"Claim {call_sid} processed: {result.routing_decision.value} - {result.routing_reason}")
         
         return result
