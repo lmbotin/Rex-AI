@@ -10,15 +10,15 @@ from typing import Any, Dict, List, Optional
 
 from .image_analyzer import ImageAnalysisResult
 from .schema import (
+    AssetType,
     ClaimantInfo,
     ConsistencyFlags,
-    DamageSeverity,
-    DamageType,
     EvidenceChecklist,
+    ImpactSeverity,
     IncidentInfo,
-    PropertyDamageClaim,
-    PropertyDamageInfo,
-    PropertyType,
+    IncidentType,
+    OperationalImpactInfo,
+    OperationalLiabilityClaim,
     Provenance,
     SourceModality,
 )
@@ -41,7 +41,7 @@ class ClaimFusion:
         text_extraction: Dict[str, Any],
         image_results: List[ImageAnalysisResult],
         claimant_info: Optional[Dict[str, str]] = None
-    ) -> PropertyDamageClaim:
+    ) -> OperationalLiabilityClaim:
         """
         Fuse text and image analysis into complete claim.
 
@@ -51,7 +51,7 @@ class ClaimFusion:
             claimant_info: Optional claimant information
 
         Returns:
-            Complete PropertyDamageClaim with provenance
+            Complete OperationalLiabilityClaim with provenance
         """
         # Generate claim ID
         claim_id = self._generate_claim_id()
@@ -62,8 +62,8 @@ class ClaimFusion:
         # Build incident info with provenance
         incident = self._build_incident(text_extraction)
 
-        # Build property damage info with provenance
-        property_damage = self._build_property_damage(text_extraction, image_results)
+        # Build operational impact info with provenance
+        operational_impact = self._build_operational_impact(text_extraction, image_results)
 
         # Build evidence checklist
         evidence = self._build_evidence_checklist(image_results)
@@ -72,15 +72,15 @@ class ClaimFusion:
         consistency = self._detect_conflicts(text_extraction, image_results, evidence)
 
         # Create claim
-        claim = PropertyDamageClaim(
+        claim = OperationalLiabilityClaim(
             claim_id=claim_id,
             claimant=claimant,
             incident=incident,
-            property_damage=property_damage,
+            operational_impact=operational_impact,
             evidence=evidence,
             consistency=consistency,
             created_at=datetime.utcnow(),
-            schema_version="1.0.0"
+            schema_version="2.0.0"
         )
 
         return claim
@@ -133,113 +133,113 @@ class ClaimFusion:
                 pointer="text_span:full"
             )
 
-        # Damage type
-        damage_type_str = text_extraction.get('damage_type', 'unknown')
+        # Incident type
+        incident_type_str = text_extraction.get('incident_type', 'unknown')
         try:
-            incident_data['damage_type'] = DamageType(damage_type_str.lower())
+            incident_data['incident_type'] = IncidentType(incident_type_str.lower())
         except ValueError:
-            incident_data['damage_type'] = DamageType.UNKNOWN
+            incident_data['incident_type'] = IncidentType.UNKNOWN
 
-        incident_data['damage_type_provenance'] = Provenance(
+        incident_data['incident_type_provenance'] = Provenance(
             source_modality=SourceModality.TEXT,
-            confidence=text_extraction.get('damage_type_confidence', 0.5),
+            confidence=text_extraction.get('incident_type_confidence', 0.5),
             pointer="text_span:full"
         )
 
         return IncidentInfo(**incident_data)
 
-    def _build_property_damage(
+    def _build_operational_impact(
         self,
         text_extraction: Dict[str, Any],
         image_results: List[ImageAnalysisResult]
-    ) -> PropertyDamageInfo:
-        """Build property damage information with provenance."""
-        damage_data = {}
+    ) -> OperationalImpactInfo:
+        """Build operational impact information with provenance."""
+        impact_data = {}
 
-        # Property type
-        property_type_str = text_extraction.get('property_type', 'unknown')
+        # Asset type
+        asset_type_str = text_extraction.get('asset_type', 'unknown')
         try:
-            damage_data['property_type'] = PropertyType(property_type_str.lower())
+            impact_data['asset_type'] = AssetType(asset_type_str.lower())
         except ValueError:
-            damage_data['property_type'] = PropertyType.UNKNOWN
+            impact_data['asset_type'] = AssetType.UNKNOWN
 
-        damage_data['property_type_provenance'] = Provenance(
+        impact_data['asset_type_provenance'] = Provenance(
             source_modality=SourceModality.TEXT,
-            confidence=text_extraction.get('property_type_confidence', 0.5),
+            confidence=text_extraction.get('asset_type_confidence', 0.5),
             pointer="text_span:full"
         )
 
-        # Room location
-        if text_extraction.get('room_location'):
-            damage_data['room_location'] = text_extraction['room_location']
-            damage_data['room_location_provenance'] = Provenance(
+        # System component
+        if text_extraction.get('system_component'):
+            impact_data['system_component'] = text_extraction['system_component']
+            impact_data['system_component_provenance'] = Provenance(
                 source_modality=SourceModality.TEXT,
-                confidence=text_extraction.get('room_location_confidence', 0.5),
+                confidence=text_extraction.get('system_component_confidence', 0.5),
                 pointer="text_span:full"
             )
 
-        # Estimated repair cost
-        if text_extraction.get('estimated_repair_cost') is not None:
-            damage_data['estimated_repair_cost'] = float(text_extraction['estimated_repair_cost'])
-            damage_data['estimated_repair_cost_provenance'] = Provenance(
+        # Estimated liability cost
+        if text_extraction.get('estimated_liability_cost') is not None:
+            impact_data['estimated_liability_cost'] = float(text_extraction['estimated_liability_cost'])
+            impact_data['estimated_liability_cost_provenance'] = Provenance(
                 source_modality=SourceModality.TEXT,
-                confidence=text_extraction.get('estimated_repair_cost_confidence', 0.5),
+                confidence=text_extraction.get('estimated_liability_cost_confidence', 0.5),
                 pointer="text_span:full"
             )
 
-        # Damage severity
-        severity_str = text_extraction.get('damage_severity', 'unknown')
+        # Impact severity
+        severity_str = text_extraction.get('impact_severity', 'unknown')
         try:
-            damage_data['damage_severity'] = DamageSeverity(severity_str.lower())
+            impact_data['impact_severity'] = ImpactSeverity(severity_str.lower())
         except ValueError:
-            damage_data['damage_severity'] = DamageSeverity.UNKNOWN
+            impact_data['impact_severity'] = ImpactSeverity.UNKNOWN
 
-        # Boost severity confidence if we have damage photos
-        damage_photo_count = sum(1 for r in image_results if r.contains_damage)
-        base_confidence = text_extraction.get('damage_severity_confidence', 0.5)
-        if damage_photo_count > 0:
-            # Slightly boost confidence if images support damage claim
+        # Boost severity confidence if we have supporting logs/documents
+        log_count = sum(1 for r in image_results if r.image_type == 'document')
+        base_confidence = text_extraction.get('impact_severity_confidence', 0.5)
+        if log_count > 0:
+            # Slightly boost confidence if documents support claim
             base_confidence = min(base_confidence + 0.1, 1.0)
 
-        damage_data['damage_severity_provenance'] = Provenance(
+        impact_data['impact_severity_provenance'] = Provenance(
             source_modality=SourceModality.TEXT,
             confidence=base_confidence,
             pointer="text_span:full"
         )
 
-        return PropertyDamageInfo(**damage_data)
+        return OperationalImpactInfo(**impact_data)
 
     def _build_evidence_checklist(
         self,
         image_results: List[ImageAnalysisResult]
     ) -> EvidenceChecklist:
         """Build evidence checklist from image analysis."""
-        # Count damage photos
-        damage_photos = [r for r in image_results if r.contains_damage]
-        damage_photo_count = len(damage_photos)
-        damage_photo_ids = [r.image_path for r in damage_photos]
+        # Count system logs/documents
+        log_docs = [r for r in image_results if r.image_type in ('document', 'log')]
+        system_log_count = len(log_docs)
+        system_log_ids = [r.image_path for r in log_docs]
 
-        # Check for receipts/estimates
-        has_receipt = any(r.image_type == 'receipt' for r in image_results)
+        # Check for liability assessments (receipts in old domain)
+        has_assessment = any(r.image_type == 'receipt' for r in image_results)
 
-        # Check for documents (incident reports)
-        has_document = any(r.image_type == 'document' for r in image_results)
+        # Check for incident reports
+        has_report = any(r.image_type == 'document' for r in image_results)
 
         # Determine missing evidence
         missing = []
-        if damage_photo_count == 0:
-            missing.append("damage_photos")
-        if not has_receipt:
-            missing.append("repair_estimate")
-        if not has_document:
+        if system_log_count == 0:
+            missing.append("system_logs")
+        if not has_assessment:
+            missing.append("liability_assessment")
+        if not has_report:
             missing.append("incident_report")
 
         return EvidenceChecklist(
-            has_damage_photos=damage_photo_count > 0,
-            damage_photo_count=damage_photo_count,
-            damage_photo_ids=damage_photo_ids,
-            has_repair_estimate=has_receipt,
-            has_incident_report=has_document,
+            has_system_logs=system_log_count > 0,
+            system_log_count=system_log_count,
+            system_log_ids=system_log_ids,
+            has_liability_assessment=has_assessment,
+            has_incident_report=has_report,
             missing_evidence=missing
         )
 
@@ -260,24 +260,24 @@ class ClaimFusion:
         conflicts = []
 
         # Check for low confidence on critical fields
-        if text_extraction.get('damage_type_confidence', 1.0) < 0.3:
+        if text_extraction.get('incident_type_confidence', 1.0) < 0.3:
             conflicts.append(
-                "Low confidence damage type extraction "
-                f"({text_extraction.get('damage_type_confidence', 0.0):.2f})"
+                "Low confidence incident type extraction "
+                f"({text_extraction.get('incident_type_confidence', 0.0):.2f})"
             )
 
-        # Check for missing damage photos
-        if evidence.damage_photo_count == 0:
-            conflicts.append("No damage photos provided - cannot verify damage visually")
+        # Check for missing system logs
+        if evidence.system_log_count == 0:
+            conflicts.append("No system logs provided - cannot verify incident details")
 
         # Check for missing cost estimate
-        if text_extraction.get('estimated_repair_cost') is None:
-            conflicts.append("No estimated repair cost provided")
+        if text_extraction.get('estimated_liability_cost') is None:
+            conflicts.append("No estimated liability cost provided")
 
         # Check for incomplete location information
         if not text_extraction.get('incident_location') or \
            text_extraction.get('incident_location_confidence', 0) < 0.3:
-            conflicts.append("Incident location missing or uncertain")
+            conflicts.append("Incident location (system/node) missing or uncertain")
 
         return ConsistencyFlags(
             has_conflicts=len(conflicts) > 0,

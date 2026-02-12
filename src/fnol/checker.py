@@ -1,7 +1,7 @@
 """
-Evidence Completeness & Consistency Checker for Property Damage Claims.
+Evidence Completeness & Consistency Checker for Operational Liability Claims.
 
-Analyzes a PropertyDamageClaim to:
+Analyzes an OperationalLiabilityClaim to:
 - Calculate completeness score based on required evidence
 - Detect contradictions and inconsistencies
 - Generate targeted follow-up questions
@@ -12,7 +12,7 @@ from typing import List
 
 from pydantic import BaseModel, Field
 
-from .schema import PropertyDamageClaim, DamageType, PropertyType, DamageSeverity
+from .schema import OperationalLiabilityClaim, IncidentType, AssetType, ImpactSeverity
 
 
 class CheckReport(BaseModel):
@@ -49,23 +49,23 @@ class CheckReport(BaseModel):
             "examples": [
                 {
                     "completeness_score": 0.75,
-                    "missing_required_evidence": ["incident_location", "repair_estimate_document"],
-                    "contradictions": ["High estimated cost ($8000) but no repair estimate document provided"],
+                    "missing_required_evidence": ["incident_location", "liability_assessment"],
+                    "contradictions": ["High estimated cost ($50000) but no liability assessment provided"],
                     "recommended_questions": [
-                        "Can you provide the exact address where the damage occurred?",
-                        "Do you have a written repair estimate from a contractor?"
+                        "Can you provide the system node or hub ID where the incident occurred?",
+                        "Do you have a written liability assessment from the operations team?"
                     ]
                 }
             ]
         }
 
 
-def check_claim(claim: PropertyDamageClaim) -> CheckReport:
+def check_claim(claim: OperationalLiabilityClaim) -> CheckReport:
     """
     Analyze a claim for completeness and consistency.
 
     Args:
-        claim: The PropertyDamageClaim to check
+        claim: The OperationalLiabilityClaim to check
 
     Returns:
         CheckReport with completeness score, missing evidence, contradictions,
@@ -83,12 +83,12 @@ def check_claim(claim: PropertyDamageClaim) -> CheckReport:
     tier1_items = []
     tier1_present = []
 
-    # Damage photos (≥1)
-    tier1_items.append("damage_photos")
-    if claim.evidence.has_damage_photos and claim.evidence.damage_photo_count >= 1:
-        tier1_present.append("damage_photos")
+    # System logs (≥1)
+    tier1_items.append("system_logs")
+    if claim.evidence.has_system_logs and claim.evidence.system_log_count >= 1:
+        tier1_present.append("system_logs")
     else:
-        missing_evidence.append("damage_photos")
+        missing_evidence.append("system_logs")
 
     # Incident description
     tier1_items.append("incident_description")
@@ -97,37 +97,37 @@ def check_claim(claim: PropertyDamageClaim) -> CheckReport:
     else:
         missing_evidence.append("incident_description")
 
-    # Damage type (not unknown)
-    tier1_items.append("damage_type")
-    if claim.incident.damage_type != DamageType.UNKNOWN:
-        tier1_present.append("damage_type")
+    # Incident type (not unknown)
+    tier1_items.append("incident_type")
+    if claim.incident.incident_type != IncidentType.UNKNOWN:
+        tier1_present.append("incident_type")
     else:
-        missing_evidence.append("damage_type")
+        missing_evidence.append("incident_type")
 
-    # Property type (not unknown)
-    tier1_items.append("property_type")
-    if claim.property_damage.property_type != PropertyType.UNKNOWN:
-        tier1_present.append("property_type")
+    # Asset type (not unknown)
+    tier1_items.append("asset_type")
+    if claim.operational_impact.asset_type != AssetType.UNKNOWN:
+        tier1_present.append("asset_type")
     else:
-        missing_evidence.append("property_type")
+        missing_evidence.append("asset_type")
 
     # Tier 2 (Important - 30% weight)
     tier2_items = []
     tier2_present = []
 
-    # Incident location
+    # Incident location (system/node)
     tier2_items.append("incident_location")
     if claim.incident.incident_location and claim.incident.incident_location.strip():
         tier2_present.append("incident_location")
     else:
         missing_evidence.append("incident_location")
 
-    # Estimated repair cost
-    tier2_items.append("estimated_repair_cost")
-    if claim.property_damage.estimated_repair_cost is not None:
-        tier2_present.append("estimated_repair_cost")
+    # Estimated liability cost
+    tier2_items.append("estimated_liability_cost")
+    if claim.operational_impact.estimated_liability_cost is not None:
+        tier2_present.append("estimated_liability_cost")
     else:
-        missing_evidence.append("estimated_repair_cost")
+        missing_evidence.append("estimated_liability_cost")
 
     # Incident date
     tier2_items.append("incident_date")
@@ -140,26 +140,26 @@ def check_claim(claim: PropertyDamageClaim) -> CheckReport:
     tier3_items = []
     tier3_present = []
 
-    # Repair estimate document
-    tier3_items.append("repair_estimate_document")
-    if claim.evidence.has_repair_estimate:
-        tier3_present.append("repair_estimate_document")
+    # Liability assessment document
+    tier3_items.append("liability_assessment")
+    if claim.evidence.has_liability_assessment:
+        tier3_present.append("liability_assessment")
     else:
-        missing_evidence.append("repair_estimate_document")
+        missing_evidence.append("liability_assessment")
 
-    # Room location
-    tier3_items.append("room_location")
-    if claim.property_damage.room_location and claim.property_damage.room_location.strip():
-        tier3_present.append("room_location")
+    # System component
+    tier3_items.append("system_component")
+    if claim.operational_impact.system_component and claim.operational_impact.system_component.strip():
+        tier3_present.append("system_component")
     else:
-        missing_evidence.append("room_location")
+        missing_evidence.append("system_component")
 
-    # Multiple photos (≥2)
-    tier3_items.append("multiple_photos")
-    if claim.evidence.damage_photo_count >= 2:
-        tier3_present.append("multiple_photos")
+    # Multiple logs (≥2)
+    tier3_items.append("multiple_logs")
+    if claim.evidence.system_log_count >= 2:
+        tier3_present.append("multiple_logs")
     else:
-        missing_evidence.append("multiple_photos")
+        missing_evidence.append("multiple_logs")
 
     # Calculate completeness score
     tier1_score = (len(tier1_present) / len(tier1_items)) * 0.6 if tier1_items else 0.0
@@ -173,38 +173,41 @@ def check_claim(claim: PropertyDamageClaim) -> CheckReport:
     # ========================================================================
 
     # 1. Low confidence (<0.3) on critical fields
-    if claim.incident.damage_type_provenance and claim.incident.damage_type_provenance.confidence < 0.3:
-        contradictions.append("Low confidence on damage type classification (confidence < 0.3)")
+    if claim.incident.incident_type_provenance and claim.incident.incident_type_provenance.confidence < 0.3:
+        contradictions.append("Low confidence on incident type classification (confidence < 0.3)")
 
-    if claim.property_damage.property_type_provenance and claim.property_damage.property_type_provenance.confidence < 0.3:
-        contradictions.append("Low confidence on property type classification (confidence < 0.3)")
+    if claim.operational_impact.asset_type_provenance and claim.operational_impact.asset_type_provenance.confidence < 0.3:
+        contradictions.append("Low confidence on asset type classification (confidence < 0.3)")
 
     if claim.incident.incident_description_provenance and claim.incident.incident_description_provenance.confidence < 0.3:
         contradictions.append("Low confidence on incident description extraction (confidence < 0.3)")
 
     # 2. Severity vs cost mismatches
-    severity = claim.property_damage.damage_severity
-    cost = claim.property_damage.estimated_repair_cost
+    severity = claim.operational_impact.impact_severity
+    cost = claim.operational_impact.estimated_liability_cost
 
-    if severity == DamageSeverity.SEVERE and cost is not None and cost < 1000:
+    if severity == ImpactSeverity.CRITICAL and cost is not None and cost < 5000:
+        contradictions.append(f"Severity marked as CRITICAL but estimated cost is only ${cost:.2f} (expected >$5000)")
+
+    if severity == ImpactSeverity.SEVERE and cost is not None and cost < 1000:
         contradictions.append(f"Severity marked as SEVERE but estimated cost is only ${cost:.2f} (expected >$1000)")
 
-    if severity == DamageSeverity.MINOR and cost is not None and cost > 10000:
-        contradictions.append(f"Severity marked as MINOR but estimated cost is ${cost:.2f} (expected <$10000)")
+    if severity == ImpactSeverity.MINOR and cost is not None and cost > 50000:
+        contradictions.append(f"Severity marked as MINOR but estimated cost is ${cost:.2f} (expected <$50000)")
 
-    # 3. No photos but claims damage
-    if not claim.evidence.has_damage_photos and claim.incident.incident_description:
-        contradictions.append("Incident description provided but no damage photos uploaded")
+    # 3. No logs but claims incident
+    if not claim.evidence.has_system_logs and claim.incident.incident_description:
+        contradictions.append("Incident description provided but no system logs uploaded")
 
-    # 4. High cost (>$5k) without estimate doc
-    if cost is not None and cost > 5000 and not claim.evidence.has_repair_estimate:
-        contradictions.append(f"High estimated cost (${cost:.2f}) but no repair estimate document provided")
+    # 4. High cost (>$25k) without liability assessment
+    if cost is not None and cost > 25000 and not claim.evidence.has_liability_assessment:
+        contradictions.append(f"High estimated cost (${cost:.2f}) but no liability assessment provided")
 
     # 5. Incident date in future or >2 years old
     if claim.incident.incident_date:
         now = datetime.utcnow()
         incident_date = claim.incident.incident_date
-        
+
         # Handle string dates (convert to datetime if needed)
         if isinstance(incident_date, str):
             try:
@@ -231,34 +234,34 @@ def check_claim(claim: PropertyDamageClaim) -> CheckReport:
     recommended_questions = []
 
     # Prioritize critical missing items first
-    if "damage_photos" in missing_evidence:
-        recommended_questions.append("Can you upload photos showing the damage?")
+    if "system_logs" in missing_evidence:
+        recommended_questions.append("Can you provide system logs or telemetry data from the incident?")
 
     if "incident_description" in missing_evidence:
-        recommended_questions.append("Can you describe what happened and how the damage occurred?")
+        recommended_questions.append("Can you describe what happened and how the operational failure occurred?")
 
-    if "damage_type" in missing_evidence or (
-        claim.incident.damage_type == DamageType.UNKNOWN
-        or (claim.incident.damage_type_provenance and claim.incident.damage_type_provenance.confidence < 0.3)
+    if "incident_type" in missing_evidence or (
+        claim.incident.incident_type == IncidentType.UNKNOWN
+        or (claim.incident.incident_type_provenance and claim.incident.incident_type_provenance.confidence < 0.3)
     ):
-        recommended_questions.append("Can you clarify what caused the damage? (water, fire, impact, weather, etc.)")
+        recommended_questions.append("Can you clarify the type of incident? (misroute, delay, loss, data error, prediction failure, pricing error, system outage)")
 
-    if "property_type" in missing_evidence:
-        recommended_questions.append("What part of the property was damaged? (window, roof, ceiling, wall, etc.)")
+    if "asset_type" in missing_evidence:
+        recommended_questions.append("What type of asset was affected? (shipment, package, container, AI model, sensor, route, etc.)")
 
     # Then important items
     if "incident_location" in missing_evidence:
-        recommended_questions.append("Can you provide the exact address where the damage occurred?")
+        recommended_questions.append("Can you provide the system node, hub ID, or facility where the incident occurred?")
 
     if "incident_date" in missing_evidence:
-        recommended_questions.append("When did the damage occur?")
+        recommended_questions.append("When did the incident occur?")
 
-    if "estimated_repair_cost" in missing_evidence:
-        recommended_questions.append("Do you have a repair estimate or expected cost range?")
+    if "estimated_liability_cost" in missing_evidence:
+        recommended_questions.append("Do you have a liability estimate or expected cost range?")
 
     # If severity is unclear or cost seems off
-    if severity == DamageSeverity.UNKNOWN:
-        recommended_questions.append("How would you describe the severity of the damage? (minor, moderate, or severe)")
+    if severity == ImpactSeverity.UNKNOWN:
+        recommended_questions.append("How would you describe the impact severity? (minor, moderate, severe, or critical)")
 
     # Limit to 3 most relevant questions
     recommended_questions = recommended_questions[:3]

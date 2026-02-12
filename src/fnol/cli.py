@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import List
 
 from .config import ExtractionConfig
-from .operational_pipeline import parse_claim
+from .pipeline import parse_claim
 
 
 def setup_logging(verbose: bool = False):
@@ -196,7 +196,7 @@ def main():
         logger.info("Starting claim parsing...")
         claim = parse_claim(
             text=text,
-            attachment_paths=attachment_paths,
+            image_paths=attachment_paths,
             claimant_info=claimant_info if claimant_info else None,
             config=config
         )

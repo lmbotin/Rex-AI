@@ -1,7 +1,7 @@
 """
-Main extraction pipeline for FNOL claims.
+Main extraction pipeline for Track & Trace / AI Operational Liability claims.
 
-Public API: parse_claim(text, image_paths) -> PropertyDamageClaim
+Public API: parse_claim(text, image_paths) -> OperationalLiabilityClaim
 """
 
 import logging
@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 from .config import ExtractionConfig
 from .fusion import ClaimFusion
 from .image_analyzer import create_image_analyzer
-from .schema import PropertyDamageClaim
+from .schema import OperationalLiabilityClaim
 from .text_extractor import create_text_extractor
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class ExtractionPipeline:
     """
-    Multimodal extraction pipeline for property damage claims.
+    Multimodal extraction pipeline for operational liability claims.
 
     Orchestrates text extraction, image analysis, and fusion.
     """
@@ -49,26 +49,26 @@ class ExtractionPipeline:
         text: str,
         image_paths: List[str],
         claimant_info: Optional[Dict[str, str]] = None
-    ) -> PropertyDamageClaim:
+    ) -> OperationalLiabilityClaim:
         """
         Parse claim from text description and images.
 
         Args:
-            text: Text description of the claim
-            image_paths: List of paths to images
+            text: Text description of the incident
+            image_paths: List of paths to images/logs
             claimant_info: Optional claimant information dict
                           (keys: name, policy_number, contact_phone, contact_email)
 
         Returns:
-            PropertyDamageClaim validated against schema with provenance
+            OperationalLiabilityClaim validated against schema with provenance
 
         Example:
             ```python
             pipeline = ExtractionPipeline()
             claim = pipeline.parse_claim(
-                text="Pipe burst in ceiling causing water damage to living room",
-                image_paths=["damage1.jpg", "damage2.jpg"],
-                claimant_info={"name": "John Doe", "policy_number": "POL-123"}
+                text="Shipment delayed 48 hours due to routing model failure",
+                image_paths=["log1.json", "log2.json"],
+                claimant_info={"name": "Acme Corp", "policy_number": "POL-TT-123"}
             )
             ```
         """
@@ -84,25 +84,25 @@ class ExtractionPipeline:
         text_extraction = self.text_extractor.extract(text)
         logger.debug(
             f"Text extraction complete: "
-            f"damage_type={text_extraction.get('damage_type')}, "
+            f"incident_type={text_extraction.get('incident_type')}, "
             f"extraction_time={text_extraction.get('extraction_time_ms', 0):.0f}ms"
         )
 
-        # Step 2: Analyze images
-        logger.debug(f"Step 2: Analyzing {len(image_paths)} images...")
+        # Step 2: Analyze images/documents
+        logger.debug(f"Step 2: Analyzing {len(image_paths)} images/documents...")
         image_results = []
         if image_paths:
             image_results = self.image_analyzer.analyze_batch(image_paths)
-            damage_count = sum(1 for r in image_results if r.contains_damage)
+            doc_count = sum(1 for r in image_results if r.image_type == 'document')
             logger.debug(
-                f"Image analysis complete: "
-                f"{damage_count}/{len(image_results)} contain damage"
+                f"Document analysis complete: "
+                f"{doc_count}/{len(image_results)} are documents"
             )
         else:
-            logger.debug("No images provided")
+            logger.debug("No images/documents provided")
 
         # Step 3: Fuse text + images into final claim
-        logger.debug("Step 3: Fusing text and image analysis...")
+        logger.debug("Step 3: Fusing text and document analysis...")
         claim = self.fusion.fuse(
             text_extraction=text_extraction,
             image_results=image_results,
@@ -125,7 +125,7 @@ class ExtractionPipeline:
 
     def _log_metrics(
         self,
-        claim: PropertyDamageClaim,
+        claim: OperationalLiabilityClaim,
         text_extraction: Dict,
         total_time_ms: float
     ):
@@ -133,10 +133,10 @@ class ExtractionPipeline:
         metrics = {
             'total_time_ms': total_time_ms,
             'text_extraction_time_ms': text_extraction.get('extraction_time_ms', 0),
-            'damage_type': claim.incident.damage_type.value,
-            'property_type': claim.property_damage.property_type.value,
-            'has_damage_photos': claim.evidence.has_damage_photos,
-            'damage_photo_count': claim.evidence.damage_photo_count,
+            'incident_type': claim.incident.incident_type.value,
+            'asset_type': claim.operational_impact.asset_type.value,
+            'has_system_logs': claim.evidence.has_system_logs,
+            'system_log_count': claim.evidence.system_log_count,
             'missing_evidence_count': len(claim.evidence.missing_evidence),
             'has_conflicts': claim.consistency.has_conflicts,
             'conflict_count': len(claim.consistency.conflict_details),
@@ -154,33 +154,33 @@ def parse_claim(
     image_paths: List[str],
     claimant_info: Optional[Dict[str, str]] = None,
     config: Optional[ExtractionConfig] = None
-) -> PropertyDamageClaim:
+) -> OperationalLiabilityClaim:
     """
     Parse claim from text and images (convenience function).
 
     This is the main public API for the extraction pipeline.
 
     Args:
-        text: Text description of the claim
-        image_paths: List of paths to images
+        text: Text description of the incident
+        image_paths: List of paths to images/logs
         claimant_info: Optional claimant information
         config: Optional extraction configuration
 
     Returns:
-        PropertyDamageClaim validated against schema
+        OperationalLiabilityClaim validated against schema
 
     Example:
         ```python
         from src.fnol.pipeline import parse_claim
 
         claim = parse_claim(
-            text="Water damage from burst pipe in bathroom ceiling",
-            image_paths=["img1.jpg", "img2.jpg"],
-            claimant_info={"name": "Jane Doe"}
+            text="Package lost at HUB-LAX-03 due to system outage",
+            image_paths=["log1.json", "log2.json"],
+            claimant_info={"name": "Acme Logistics"}
         )
 
         print(f"Claim ID: {claim.claim_id}")
-        print(f"Damage Type: {claim.incident.damage_type}")
+        print(f"Incident Type: {claim.incident.incident_type}")
         print(f"Missing Evidence: {claim.evidence.missing_evidence}")
         ```
     """
