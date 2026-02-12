@@ -1,0 +1,15 @@
+{
+  "users": [],
+  "policies": [],
+  "claims": [],
+  "callRequests": [
+    {
+      "requestId": "call_1770766862835_61977",
+      "userId": "user_test",
+      "phone": "+1 (555) 901-2468",
+      "topic": "Test callback",
+      "status": "queued",
+      "createdAt": "2026-02-10T23:41:02.835Z"
+    }
+  ]
+}
