@@ -1,4 +1,4 @@
-# Gana AI Insurance Platform
+# Rex AI Insurance Platform
 
 Monorepo for the Gana AI Insurance platform.
 
