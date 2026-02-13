@@ -151,10 +151,10 @@ Rex/
 
 **<ins>Tech stack<ins>**
 
-- Frontend — React 19, Vite, Tailwind CSS, Radix UI, Recharts
-- Backend — Python 3.11, FastAPI, Uvicorn
-- AI — OpenAI GPT-4o (chat + vision + extraction)
-- Deployment — Vercel (frontend), Render (backend)
+- Frontend: React 19, Vite, Tailwind CSS, Radix UI, Recharts
+- Backend: Python 3.11, FastAPI, Uvicorn
+- AI: OpenAI GPT-4o (chat + vision + extraction)
+- Deployment: Vercel (frontend), Render (backend)
 
 **<ins>Environment vars<ins>**
 
