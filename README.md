@@ -6,7 +6,7 @@ AI-native insurance platform for operational/ AI liability claims.
 
 ---
 
-**<u>Current demo status (sprint 2)<u>**
+**<ins>Current demo status (sprint 2)<ins>**
 
 Easiest way to see the demo today is
 
@@ -39,7 +39,7 @@ Everything else (Overview, Policies, Rex AI copilot) is placeholder UI to show t
 
 ---
 
-**<ins>Running locally<u>** (same as above, just locally, without render/vercel)
+**<ins>Running locally<ins>** (same as above, just locally, without render/vercel)
 
 Prerequisites:
 - Node.js >= 18 (tested with v20+)
@@ -118,7 +118,7 @@ Then go to http://localhost:5173, sign up, navigate to Claims > Chat with Sarah 
 
 ---
 
-**<u>Project structure<u>**
+**<ins>Project structure<ins>**
 
 ```
 Rex/
@@ -151,14 +151,14 @@ Rex/
 └── README.md
 ```
 
-**<u>Tech stack<u>**
+**<ins>Tech stack<ins>**
 
 - Frontend — React 19, Vite, Tailwind CSS, Radix UI, Recharts
 - Backend — Python 3.11, FastAPI, Uvicorn
 - AI — OpenAI GPT-4o (chat + vision + extraction)
 - Deployment — Vercel (frontend), Render (backend)
 
-**<u>Environment vars<u>**
+**<ins>Environment vars<ins>**
 
 The backend requires an OpenAI API key. Copy `.env.example` to `backend/.env` and set:
 
@@ -170,7 +170,7 @@ All other variables are optional with any reasonble defaults. See `.env.example`
 
 ---
 
-**<u>TDeployment<u>**
+**<ins>TDeployment<ins>**
 
 - Frontend: Vercel — root directory: `frontend/`, build command: `npm run build`, output: `dist/`
 - Backend: Render — root directory: `backend/`, start command: `uvicorn src.web.chat_app:app --host 0.0.0.0 --port $PORT`
